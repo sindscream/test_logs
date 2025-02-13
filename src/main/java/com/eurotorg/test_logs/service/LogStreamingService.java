@@ -1,4 +1,6 @@
 package com.eurotorg.test_logs.service;
+import com.eurotorg.test_logs.configuration.TestLogsProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -8,18 +10,17 @@ import java.io.RandomAccessFile;
 import java.nio.file.*;
 
 @Service
+@RequiredArgsConstructor
 public class LogStreamingService {
 
     private final SimpMessagingTemplate messagingTemplate;
 
-    public LogStreamingService(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
-    }
+    private final TestLogsProperties testLogsProperties;
 
     @PostConstruct
     public void init() {
         // Path to the Laravel log file (update this to your log file path)
-        Path logFilePath = Paths.get("/Users/aleh/PhpstormProjects/emallphp/storage/logs/laravel.log");
+        Path logFilePath = Paths.get(testLogsProperties.getLogPath());
 
         // Start a thread to monitor the log file
         new Thread(() -> {
