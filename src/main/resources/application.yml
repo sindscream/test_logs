@@ -1,2 +1,10 @@
 server:
   port: 8999
+
+logging:
+  level:
+#    org.springframework.test.context.cache: DEBUG
+    com.eurotorg.test_logs: TRACE
+
+test-logs:
+  logPath: '/Users/aleh/PhpstormProjects/emallphp/storage/logs/laravel.log'

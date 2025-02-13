@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.eurotorg.test_logs.configuration.DefaultBeanConfiguration

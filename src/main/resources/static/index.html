@@ -7,22 +7,80 @@
 </head>
 <body>
 <h1>Laravel Log Stream</h1>
+
+<!-- Form for specifying log file path -->
+<div>
+    <label for="logPath">Log File Path:</label>
+    <input type="text" id="logPath" value="">
+    <button onclick="loadLogs()">Load Logs</button>
+</div>
+
+<!-- Pagination controls -->
+<div>
+    <button onclick="previousPage()">Previous</button>
+    <span id="pageInfo">Page 1</span>
+    <button onclick="nextPage()">Next</button>
+</div>
+
+<!-- Log display area -->
 <pre id="logs"></pre>
+
+<!-- WebSocket log stream -->
+<h2>Real-Time Log Stream</h2>
+<pre id="streamLogs"></pre>
 
 <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
 <script>
+    let currentPage = 0;
+    const pageSize = 10;
+
+    // Load logs for the current page
+    function loadLogs() {
+        const logPath = document.getElementById('logPath').value;
+        fetch(`/v2/logs?path=${encodeURIComponent(logPath)}&page=${currentPage}&size=${pageSize}`)
+            .then(response => response.json())
+            .then(data => {
+                const logElement = document.getElementById('logs');
+                logElement.textContent = data.join('\n');
+                updatePageInfo();
+            });
+    }
+
+    // Update pagination info
+    function updatePageInfo() {
+        document.getElementById('pageInfo').textContent = `Page ${currentPage + 1}`;
+    }
+
+    // Navigate to the previous page
+    function previousPage() {
+        if (currentPage > 0) {
+            currentPage--;
+            loadLogs();
+        }
+    }
+
+    // Navigate to the next page
+    function nextPage() {
+        currentPage++;
+        loadLogs();
+    }
+
+    // WebSocket for real-time log streaming
     const socket = new SockJS('/ws-logs');
     const stompClient = Stomp.over(socket);
 
     stompClient.connect({}, function (frame) {
         console.log('Connected to WebSocket');
         stompClient.subscribe('/topic/logs', function (message) {
-            const logElement = document.getElementById('logs');
+            const logElement = document.getElementById('streamLogs');
             logElement.textContent += message.body + '\n';
             logElement.scrollTop = logElement.scrollHeight; // Auto-scroll
         });
     });
+
+    // Load logs on page load
+    window.onload = loadLogs;
 </script>
 </body>
 </html>
