@@ -3,84 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Log Stream</title>
+    <title>Laravel Log Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
 </head>
 <body>
-<h1>Laravel Log Stream</h1>
+<div id="app">
+    <h1>Laravel Log Viewer</h1>
 
-<!-- Form for specifying log file path -->
-<div>
-    <label for="logPath">Log File Path:</label>
-    <input type="text" id="logPath" value="">
-    <button onclick="loadLogs()">Load Logs</button>
+    <!-- Log file path input -->
+    <div>
+        <label for="logPath">Log File Path:</label>
+        <input type="text" id="logPath" v-model="logPath">
+        <button @click="loadLogs">Load Logs</button>
+    </div>
+
+    <!-- Pagination controls -->
+    <div>
+        <button @click="previousPage">Previous</button>
+        <span>Page {{ currentPage + 1 }}</span>
+        <button @click="nextPage">Next</button>
+    </div>
+
+    <!-- Log display area -->
+    <pre v-if="logs.length > 0">{{ logs.join('\n') }}</pre>
+    <p v-else>No logs available.</p>
+
+    <!-- Real-time log stream -->
+    <h2>Real-Time Log Stream</h2>
+    <pre>{{ streamLogs.join('\n') }}</pre>
 </div>
 
-<!-- Pagination controls -->
-<div>
-    <button onclick="previousPage()">Previous</button>
-    <span id="pageInfo">Page 1</span>
-    <button onclick="nextPage()">Next</button>
-</div>
-
-<!-- Log display area -->
-<pre id="logs"></pre>
-
-<!-- WebSocket log stream -->
-<h2>Real-Time Log Stream</h2>
-<pre id="streamLogs"></pre>
-
-<script src="https://cdn.jsdelivr.net/npm/sockjs-client/dist/sockjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/stompjs/lib/stomp.min.js"></script>
 <script>
-    let currentPage = 0;
-    const pageSize = 10;
+    new Vue({
+        el: '#app',
+        data: {
+            logPath: '', // Default log path
+            logs: [], // Paginated logs (initialized as an empty array)
+            streamLogs: [], // Real-time logs
+            currentPage: 0, // Current page number
+            pageSize: 10, // Number of logs per page
+            totalLogs: 0, // Total number of logs
+            stompClient: null // WebSocket client
+        },
+        computed: {
+            isLastPage() {
+                return (this.currentPage + 1) * this.pageSize >= this.totalLogs;
+            }
+        },
+        methods: {
+            // Load logs for the current page
+            loadLogs() {
+                fetch(`/v2/logs?path=${encodeURIComponent(this.logPath)}&page=${this.currentPage}&size=${this.pageSize}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Ensure data is an array
+                        this.logs = Array.isArray(data) ? data : [];
+                    })
+                    .catch(error => {
+                        console.error('Error loading logs:', error);
+                        this.logs = []; // Fallback to empty array on error
+                    });
+            },
+            // Navigate to the previous page
+            previousPage() {
+                if (this.currentPage > 0) {
+                    this.currentPage--;
+                    this.loadLogs();
+                }
+            },
+            // Navigate to the next page
+            nextPage() {
+                this.currentPage++;
+                this.loadLogs();
+            },
+            // Initialize WebSocket for real-time log streaming
+            initWebSocket() {
+                const socket = new SockJS('/ws-logs');
+                this.stompClient = Stomp.over(socket);
 
-    // Load logs for the current page
-    function loadLogs() {
-        const logPath = document.getElementById('logPath').value;
-        fetch(`/v2/logs?path=${encodeURIComponent(logPath)}&page=${currentPage}&size=${pageSize}`)
-            .then(response => response.json())
-            .then(data => {
-                const logElement = document.getElementById('logs');
-                logElement.textContent = data.join('\n');
-                updatePageInfo();
-            });
-    }
-
-    // Update pagination info
-    function updatePageInfo() {
-        document.getElementById('pageInfo').textContent = `Page ${currentPage + 1}`;
-    }
-
-    // Navigate to the previous page
-    function previousPage() {
-        if (currentPage > 0) {
-            currentPage--;
-            loadLogs();
+                this.stompClient.connect({}, () => {
+                    console.log('Connected to WebSocket');
+                    this.stompClient.subscribe('/topic/logs', (message) => {
+                        this.streamLogs.push(message.body);
+                    });
+                });
+            }
+        },
+        mounted() {
+            this.loadLogs(); // Load logs on page load
+            this.initWebSocket(); // Initialize WebSocket connection
         }
-    }
-
-    // Navigate to the next page
-    function nextPage() {
-        currentPage++;
-        loadLogs();
-    }
-
-    // WebSocket for real-time log streaming
-    const socket = new SockJS('/ws-logs');
-    const stompClient = Stomp.over(socket);
-
-    stompClient.connect({}, function (frame) {
-        console.log('Connected to WebSocket');
-        stompClient.subscribe('/topic/logs', function (message) {
-            const logElement = document.getElementById('streamLogs');
-            logElement.textContent += message.body + '\n';
-            logElement.scrollTop = logElement.scrollHeight; // Auto-scroll
-        });
     });
-
-    // Load logs on page load
-    window.onload = loadLogs;
 </script>
 </body>
 </html>
